@@ -1,4 +1,5 @@
 # This code was adapted from pytorch ignite CIFAR-10 example
+
 import argparse
 
 import ignite
@@ -14,11 +15,23 @@ from ignite.handlers import global_step_from_engine
 from ignite.metrics import Accuracy, Loss
 from ignite.utils import convert_tensor
 from torch.optim.lr_scheduler import MultiStepLR
+from torch.utils.data import DataLoader, SubsetRandomSampler
 
-import and_mask.and_mask_utils as and_mask_utils
-from and_mask.utils.ignite_cifar10_utils import get_train_test_loaders, get_model
-from and_mask.optimizers.adam_flexible_weight_decay import AdamFlexibleWeightDecay
 
+from . import and_mask_utils as and_mask_utils
+
+
+from .optimizers.adam_flexible_weight_decay import AdamFlexibleWeightDecay
+
+
+def set_seed(seed):
+    import random
+    import numpy as np
+    import torch
+
+    random.seed(seed)
+    torch.manual_seed(seed)
+    np.random.seed(seed)
 
 def run(output_dir, config):
     device = "cuda"
@@ -31,17 +44,63 @@ def run(output_dir, config):
     batch_size = config['batch_size']
     num_workers = int((config['num_workers'] + ngpus_per_node - 1) / ngpus_per_node)
 
-    (train_loader,
-     test_loader,
-     mislabeled_train_loader) = get_train_test_loaders(
-        path=config['data_path'],
-        batch_size=batch_size,
-        num_workers=num_workers,
-        random_seed=config['seed'],
-        random_labels_fraction=config['random_labels_fraction'],
+    #gnanfack edit, adding dataset
+    train_dataset = config["get_dataset"](
+        config['dataset_tag'],
+        data_dir =  config['data_dir'],
+        dataset_split = "train",
+        #transform_split="train",
+        percent = config["percent"],
+        with_ind = False,
+        with_bias_att = False
+    )
+    test_dataset = config['get_dataset'](
+        config['dataset_tag'],
+        data_dir = config['data_dir'],
+        dataset_split="test",
+        #transform_split="valid",
+        percent= config['percent'],
+        with_ind = False,
+        with_bias_att = False                             
     )
 
-    model = get_model(num_classes=10)
+
+    assert config['random_labels_fraction'] >= 0.0
+
+    label_rng = np.random.RandomState(seed=config['seed'])
+
+    print(f'RANDOM LABELS FRACTION: {config["random_labels_fraction"]}')
+    n_random = int(round(config['random_labels_fraction'] * len(train_dataset.labels)))
+    rnd_idxs = label_rng.choice(np.arange(len(train_dataset.labels)),
+                                size=n_random,
+                                replace=False)
+
+    original_targets = train_dataset.labels.copy()
+
+    for rnd_idx in rnd_idxs:
+        train_dataset.labels[rnd_idx] = label_rng.randint(10)
+
+    mislabeled_idxs, = np.where(np.array(original_targets) != np.array(train_dataset.labels))
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size,
+                       num_workers=num_workers,
+                       pin_memory= True,
+                       shuffle=True,
+                       drop_last=True)
+
+    mislabeled_train_loader = DataLoader(train_dataset, batch_size=config['batch_size'],
+                       num_workers=num_workers,
+                       pin_memory= True,
+                       sampler=SubsetRandomSampler(indices=mislabeled_idxs),
+                       drop_last=False)
+
+    test_loader = DataLoader(test_dataset, batch_size=config['batch_size'],
+                       num_workers=num_workers,
+                       pin_memory= True)
+
+
+    model = config['get_model'](config['model_tag'], 10).to(device)
+
     model = model.to(device)
 
     optimizer = AdamFlexibleWeightDecay(model.parameters(),
@@ -81,7 +140,7 @@ def run(output_dir, config):
                 params=optimizer.param_groups[0]['params'],
                 output=y_pred,
                 target=y,
-                method=args.method,
+                method= config['method'],
                 scale_grad_inverse_sparsity=config['scale_grad_inverse_sparsity'],
             )
         else:
@@ -156,31 +215,60 @@ def run(output_dir, config):
     tb_logger.close()
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--output_dir', type=str, required=True)
-    parser.add_argument('--num_workers', type=int, default=10)
-    parser.add_argument('--data_path', type=str, default="/tmp/cifar_dataset")
-    parser.add_argument('--agreement_threshold', type=float, required=True)
-    parser.add_argument('--weight_decay', type=float, required=True)
-    parser.add_argument('--method', type=str, choices=['and_mask', 'geom_mean'], required=True)
-    parser.add_argument('--scale_grad_inverse_sparsity', type=int, required=True)
-    parser.add_argument('--init_lr', type=float, required=True)
-    parser.add_argument('--random_labels_fraction', type=float, required=True)
-    parser.add_argument('--weight_decay_order', type=str,
-                        choices=['before', 'after'], default='before')
-    parser.add_argument('--seed', type=int, default=0)
-    parser.add_argument('--batch_size', type=int, default=80)
-    parser.add_argument('--epochs', type=int, default=80)
-    args = parser.parse_args()
+def train_andmask( main_tag,
+                    dataset_tag,
+                    model_tag,
+                    data_dir,
+                    main_batch_size,
+                    percent,
+                    output_dir,
+                    agreement_threshold,
+                    weight_decay,
+                    method,
+                    scale_grad_inverse_sparsity,
+                    init_lr,
+                    random_labels_fraction,
+                    weight_decay_order,
+                    get_dataset,
+                    get_model,
+                    seed = 0,
+                    batch_size = 80,
+                    epoch = 80,
+                    num_workers = 10, 
+                    device = "cuda",
+                ):
+    
+
+
+# if __name__ == "__main__":
+    # parser = argparse.ArgumentParser()
+    # parser.add_argument('--output_dir', type=str, required=True)
+    # parser.add_argument('--num_workers', type=int, default=10)
+    # parser.add_argument('--data_path', type=str, default="/tmp/cifar_dataset")
+    # parser.add_argument('--agreement_threshold', type=float, required=True)
+    # parser.add_argument('--weight_decay', type=float, required=True)
+    # parser.add_argument('--method', type=str, choices=['and_mask', 'geom_mean'], required=True)
+    # parser.add_argument('--scale_grad_inverse_sparsity', type=int, required=True)
+    # parser.add_argument('--init_lr', type=float, required=True)
+    # parser.add_argument('--random_labels_fraction', type=float, required=True)
+    # parser.add_argument('--weight_decay_order', type=str,
+    #                     choices=['before', 'after'], default='before')
+    # parser.add_argument('--seed', type=int, default=0)
+    # parser.add_argument('--batch_size', type=int, default=80)
+    # parser.add_argument('--epochs', type=int, default=80)
+    # args = parser.parse_args()
 
     assert torch.cuda.is_available()
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-    config = vars(args)
+    config = {  "dataset_tag": dataset_tag, "output_dir": output_dir, "agreement_threshold" : agreement_threshold, 
+                "weight_decay": weight_decay, "method":  method, "scale_grad_inverse_sparsity": scale_grad_inverse_sparsity,
+                "init_lr":   init_lr, "random_labels_fraction": random_labels_fraction, "data_dir": data_dir, "percent": percent,
+                "weight_decay_order": weight_decay_order, "seed" : seed, "num_workers": num_workers,"model_tag": model_tag,
+                "batch_size" : batch_size, "epochs": epoch, "get_dataset": get_dataset, "get_model": get_model, device: "cuda"}
 
-    print("Train on CIFAR10")
+    print("Train on CMNIST")
     print("- PyTorch version: {}".format(torch.__version__))
     print("- Ignite version: {}".format(ignite.__version__))
     print("- CUDA version: {}".format(torch.version.cuda))
@@ -192,7 +280,7 @@ if __name__ == "__main__":
     print("\n")
 
     try:
-        run(args.output_dir, config)
+        run(output_dir, config)
     except KeyboardInterrupt:
         print("Catched KeyboardInterrupt -> exit")
     except Exception as e:

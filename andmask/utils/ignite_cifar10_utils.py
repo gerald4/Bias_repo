@@ -17,7 +17,7 @@ def set_seed(seed):
     np.random.seed(seed)
 
 
-def get_train_test_loaders(path, batch_size, num_workers,
+def get_train_test_loaders(train_ds, test_ds, batch_size, num_workers,
                            random_seed,
                            random_labels_fraction,
                            pin_memory=True,

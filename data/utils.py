@@ -1,5 +1,6 @@
 ''' This code is taken from 
-https://github.com/kakaoenterprise/Learning-Debiased-Disentangled/blob/master/data/util.py'''
+https://github.com/kakaoenterprise/Learning-Debiased-Disentangled/blob/master/data/util.py
+'''
 
 
 import os
@@ -10,21 +11,17 @@ from glob import glob
 from PIL import Image
 
 
-import os
-import torch
-from torch.utils.data.dataset import Dataset
-from torchvision import transforms
-from glob import glob
-from PIL import Image
 
 from functools import partial
 
 
 class CMNISTDataset(Dataset):
-    def __init__(self, root, split, transform=None):
+    def __init__(self, root, split, transform=None, with_ind = True, with_bias_att = True):
         super(CMNISTDataset, self).__init__()
         self.root = root
         self.transform = transform
+        self.with_ind = with_ind
+        self.with_bias_att = with_bias_att
         if split=='train':
             self.align = glob(os.path.join(self.root, 'align', '*', '*'))
             self.conflict = glob(os.path.join(self.root, 'conflict', '*', '*'))
@@ -35,6 +32,7 @@ class CMNISTDataset(Dataset):
             self.data = glob(os.path.join(root, '../test',"*","*"))
         else: "Not 'train', 'valid', or 'test' !"
 
+        self.labels = [int(self.data[ind].split("\\")[-1].split('_')[-2]) for ind in range(len(self.data))]
 
     def __len__(self,):
         return len(self.data)
@@ -53,6 +51,10 @@ class CMNISTDataset(Dataset):
         # Get (label, color label)
         labels = torch.LongTensor([int(self.data[idx].split("\\")[-1].split('_')[-2]), int(self.data[idx].split("\\")[-1].split('_')[-1].split('.')[0])])
         # return image, (label, color label), name of img
+        if not(self.with_ind) and not(self.with_bias_att):
+            labels = labels[0]
+            return img, labels
+
         return img, labels, self.data[idx]
 
 
@@ -187,7 +189,8 @@ transforms = {
 
 
 
-def get_dataset(dataset, data_dir, dataset_split, percent, use_preprocess=None, image_path_list=None, use_type0=None, use_type1=None):
+def get_dataset(dataset, data_dir, dataset_split, percent, use_preprocess=None, 
+    image_path_list=None, use_type0=None, use_type1=None, with_ind = True, with_bias_att = True):
     
 
     dataset_category = "eval" if (dataset_split == "valid") else dataset_split
@@ -201,7 +204,7 @@ def get_dataset(dataset, data_dir, dataset_split, percent, use_preprocess=None, 
 
     if dataset == 'cmnist':
         root = data_dir + f"/cmnist/{percent}"
-        dataset = CMNISTDataset(root = root, split = dataset_split,transform=transform)
+        dataset = CMNISTDataset(root = root, split = dataset_split,transform=transform, with_ind = with_ind, with_bias_att = with_bias_att)
 
 
     return dataset

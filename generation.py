@@ -8,7 +8,9 @@ from data.utils import get_dataset
 from AImodels import get_model
 
 
+
 from llf.learner import learner
+from andmask import train_andmask
 # from Learning-Debiased-Disentangled-master.learner import Learner
 #from berlin_workshop_bias.DebiAN.cmnist_exp.debian import Trainer
 
@@ -146,6 +148,35 @@ def main():
     elif args.mitigation=="debian":
         trainer = Trainer(args)
         trainer.run()
+
+    elif args.mitigation == "andmask":
+        train_andmask( main_tag = "andmask",
+                    dataset_tag = args.dataset,
+                    model_tag = args.model,
+                    data_dir = args.data_dir,
+                    # log_dir = args.logs + args.mitigation,
+                    # target_attr_idx = args.target_attr_idx,
+                    # bias_attr_idx = args.bias_attr_idx,
+                    # main_valid_freq,
+                    main_batch_size = args.batch_size,
+                    # main_learning_rate,
+                    # main_weight_decay,
+                    percent = args.percent,
+                    num_workers = args.num_workers,
+                    output_dir = args.logs,
+                    agreement_threshold = args.lambda_penalty,
+                    weight_decay = 1e-6,
+                    method = "and_mask",
+                    scale_grad_inverse_sparsity = 1,
+                    init_lr = args.lr,
+                    random_labels_fraction = 1,
+                    weight_decay_order = "before",
+                    seed = 0,
+                    batch_size = args.batch_size,
+                    epoch = args.epoch,
+                    get_dataset = get_dataset,
+                    get_model = get_model
+                )
     else:
         print(f"Mitigation method name provided:{args.mitigation} is not: lff, ldd, debian or vanilla (normal training).")
 
