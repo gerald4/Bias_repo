@@ -13,7 +13,6 @@ from PIL import Image
 import os
 import torch
 from torch.utils.data.dataset import Dataset
-from torchvision.datasets import visionData
 from torchvision import transforms
 from glob import glob
 from PIL import Image
@@ -21,12 +20,11 @@ from PIL import Image
 from functools import partial
 
 
-class cmnistDataset(Dataset):
+class CMNISTDataset(Dataset):
     def __init__(self, root, split, transform=None):
-        super(cmnistDataset, self).__init__()
+        super(CMNISTDataset, self).__init__()
         self.root = root
         self.transform = transform
-
         if split=='train':
             self.align = glob(os.path.join(self.root, 'align', '*', '*'))
             self.conflict = glob(os.path.join(self.root, 'conflict', '*', '*'))
@@ -129,7 +127,8 @@ class CIFAR10Dataset(Dataset):
 transforms = {
     "cmnist": {
         "train": T.Compose([T.ToTensor()]),
-        "eval": T.Compose([T.ToTensor()])
+        "eval": T.Compose([T.ToTensor()]),
+        "test": T.Compose([T.ToTensor()]),
         },
     "cifar10c": {
         "train_aug": T.Compose(
@@ -188,19 +187,21 @@ transforms = {
 
 
 
-def get_dataset(dataset, data_dir, dataset_split, transform_split, percent, use_preprocess=None, image_path_list=None, use_type0=None, use_type1=None):
+def get_dataset(dataset, data_dir, dataset_split, percent, use_preprocess=None, image_path_list=None, use_type0=None, use_type1=None):
     
 
-    dataset_category = dataset.split("-")[0]
+    dataset_category = "eval" if (dataset_split == "valid") else dataset_split
+
 
     if use_preprocess:
-        transform = transforms_preprcs[dataset_category][transform_split]
+        transform = transforms_preprcs[dataset_category][dataset_split]
     else:
-        transform = transforms[dataset_category][transform_split]
-    dataset_split = "valid" if (dataset_split == "eval") else dataset_split
+        transform = transforms[dataset][dataset_category]
+
+
     if dataset == 'cmnist':
         root = data_dir + f"/cmnist/{percent}"
-        dataset = CMNISTDataset(root=root,split=dataset_split,transform=transform, image_path_list=image_path_list)
+        dataset = CMNISTDataset(root = root, split = dataset_split,transform=transform)
 
 
     return dataset

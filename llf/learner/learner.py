@@ -12,8 +12,8 @@ import numpy as np
 import pandas as pd
 
 import torch
-from torch.utils.data import DataLoader, RandomSampler, BatchSampler, WeightedRandomSampler
 from torch.utils.data.dataset import Dataset
+from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Subset
 from torchvision import transforms as T
 import torch.nn.functional as F
@@ -31,7 +31,7 @@ from .utils import MultiDimAverageMeter, EMA
 
 
 sys.path.insert(0,'..')
-from datasets import get_dataset
+from data.utils import get_dataset
 
 
 class IdxDataset(Dataset):
@@ -72,23 +72,23 @@ def train(
     print(dataset_tag)
 
     #Reading training and validation data
-    train_dataset, num_classes = get_dataset(
+    train_dataset = get_dataset(
         dataset_tag,
-        root=data_dir,
-        dataset_split="train",
+        data_dir =  data_dir,
+        dataset_split = "train",
         #transform_split="train",
-        percent=percent
+        percent = percent
     )
-    valid_dataset, num_classes = get_dataset(
+    valid_dataset = get_dataset(
         dataset_tag,
-        root=data_dir,
+        data_dir =data_dir,
         dataset_split="valid",
         #transform_split="valid",
         percent= percent
     )
-    test_dataset, num_classes = get_dataset(
+    test_dataset = get_dataset(
         dataset_tag,
-        root=data_dir,
+        data_dir = data_dir,
         dataset_split="test",
         #transform_split="valid",
         percent= percent                             
@@ -98,6 +98,7 @@ def train(
     domain of biaises (just for evaluation since the method does not assume and existing bias)
     '''
 
+    print(len(train_dataset))
     train_target_attr = []
     for data in train_dataset.data:
         train_target_attr.append(int(data.split('_')[-2]))
@@ -105,7 +106,7 @@ def train(
 
     attr_dims = []
     attr_dims.append(torch.max(train_target_attr).item() + 1)
-    # num_classes = attr_dims[0]
+    num_classes = attr_dims[0]
 
     #IdxDataset just add the first element of idx before x
     train_dataset = IdxDataset(train_dataset)
@@ -250,6 +251,8 @@ def train(
         if np.isnan(loss_d.mean().item()):
             raise NameError('loss_d')
 
+
+
         loss_per_sample_b = loss_b
         loss_per_sample_d = loss_d
 
@@ -305,13 +308,13 @@ def train(
 
             bias_attr = attr[:, bias_attr_idx]
 
-            aligned_mask = (label == bias_attr)
-            skewed_mask = (label != bias_attr)
-
+            aligned_mask = (label == bias_attr).cpu().detach()
+            skewed_mask = (label != bias_attr).cpu().detach()
             writer.add_scalar('loss_variance/b_ema', sample_loss_ema_b.parameter.var(), step)
             writer.add_scalar('loss_std/b_ema', sample_loss_ema_b.parameter.std(), step)
             writer.add_scalar('loss_variance/d_ema', sample_loss_ema_d.parameter.var(), step)
             writer.add_scalar('loss_std/d_ema', sample_loss_ema_d.parameter.std(), step)
+
 
             if aligned_mask.any().item():
                 writer.add_scalar("loss/b_train_aligned", loss_per_sample_b[aligned_mask].mean(), step)
