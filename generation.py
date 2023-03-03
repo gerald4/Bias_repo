@@ -47,7 +47,7 @@ parser.add_argument("--seed", type=int, default=14,
 parser.add_argument("--device", help="cuda or cpu", default='cuda', type=str)
 parser.add_argument("--num_workers", type=int, default=8, help="Number of workers used in PyTorch DataLoader.")
 parser.add_argument("--mitigation", type=str, default=None, help= "Mitigation methods name (lff, ldbb, debian), or train a 'vanilla' model.")
-parser.add_argument("--logs", help='log directory for saving models/experiments.', default='logs/')
+parser.add_argument("--logs", help='log directory for saving models/experiments.', default='logs')
 # parser.add_argument("--gpu", dest="gpu", action='store_true',
 #                     help="Use gpu (default).")
 # parser.add_argument("--cpu", dest="gpu", action='store_false',
@@ -123,7 +123,7 @@ def main():
         dataset_tag = args.dataset,
         model_tag = args.model,
         data_dir = args.data_dir,
-        log_dir = args.logs + args.mitigation,
+        log_dir = f"{args.logs}/{args.mitigation}_{args.dataset}",
         # log_dir = "logs/{}".format(args.mitigation),
         # device = args.device,
         device = args.device,

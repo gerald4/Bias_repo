@@ -100,8 +100,8 @@ def train(
 
     print(len(train_dataset))
     train_target_attr = []
-    for data in train_dataset.data:
-        train_target_attr.append(int(data.split('_')[-2]))
+    for data, targets, ind in tqdm(train_dataset):
+        train_target_attr.append(targets[0].detach().cpu())
     train_target_attr = torch.LongTensor(train_target_attr)
 
     attr_dims = []
