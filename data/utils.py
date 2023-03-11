@@ -193,44 +193,12 @@ transforms = {
 }
 
 
+classes = {
 
+        "cmnist": 10,
+        "celeba": 2,
+}
 
-# def get_celeba(root, batch_size, target_attr='blonde', split='train', num_workers=8, aug=True, two_crop=False, ratio=0,
-#                img_size=224, given_y=True):
-#     logging.info(f'get_celeba - split:{split}, aug: {aug}, given_y: {given_y}, ratio: {ratio}')
-
-#     dataset = BiasedCelebASplit(
-#         root=root,
-#         split=split,
-#         transform=transform,
-#         target_attr=target_attr,
-#     )
-
-#     def clip_max_ratio(score):
-#         upper_bd = score.min() * ratio
-#         return np.clip(score, None, upper_bd)
-
-#     if ratio != 0:
-#         if given_y:
-#             weights = [1 / dataset.confusion_matrix_by[c, b] for c, b in zip(dataset.targets, dataset.biases)]
-#         else:
-#             weights = [1 / dataset.confusion_matrix[b, c] for c, b in zip(dataset.targets, dataset.biases)]
-#         if ratio > 0:
-#             weights = clip_max_ratio(np.array(weights))
-#         sampler = WeightedRandomSampler(weights, len(weights), replacement=True)
-#     else:
-#         sampler = None
-
-#     # dataloader = DataLoader(
-#     #     dataset=dataset,
-#     #     batch_size=batch_size,
-#     #     shuffle=True if sampler is None else False,
-#     #     sampler=sampler,
-#     #     num_workers=num_workers,
-#     #     pin_memory=True,
-#     #     drop_last=two_crop
-#     # )
-#     return dataloader
 
 def get_dataset(dataset, data_dir, dataset_split, percent = "5pct", use_preprocess = None, 
     image_path_list = None, use_type0=None, use_type1=None, with_ind = True, with_bias_att = True, task = "makeup"):
@@ -260,8 +228,10 @@ def get_dataset(dataset, data_dir, dataset_split, percent = "5pct", use_preproce
         with_bias_att = with_bias_att
     )
 
-
-
-
-
     return dataset
+
+
+
+def get_number_classes(dataset):
+
+    return classes[dataset]
